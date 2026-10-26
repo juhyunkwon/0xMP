@@ -1,0 +1,1115 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>0xMP</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+         background: #f0f2f5; color: #1c1e21; }
+  button { border: 0; border-radius: 8px; padding: .5rem .9rem; background: #e4e6eb;
+           cursor: pointer; font-size: .95rem; }
+  button:hover { background: #d8dadf; }
+  button.primary { background: #0084ff; color: #fff; }
+  button.primary:hover { background: #0073e0; }
+  button:disabled { opacity: .45; cursor: default; }
+  input[type="text"], textarea { width: 100%; border: 1px solid #ccd0d5; border-radius: 8px;
+           padding: .55rem .7rem; font-size: .95rem; background: #fff; }
+
+  /* --- login --- */
+  #loginView { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+  .card { background: #fff; border-radius: 16px; box-shadow: 0 8px 30px rgba(0,0,0,.12);
+          padding: 2rem; width: min(420px, 92vw); }
+  .card h1 { margin: 0 0 .3rem; font-size: 1.8rem; }
+  .card p.sub { margin: 0 0 1.4rem; color: #606770; }
+  .card label { display: block; font-weight: 600; margin: 1rem 0 .35rem; }
+  .card .primary { width: 100%; margin-top: 1.2rem; padding: .7rem; font-size: 1rem; }
+  details.advanced { margin-top: 1.4rem; border-top: 1px solid #e4e6eb; padding-top: .8rem; }
+  details.advanced summary { cursor: pointer; color: #606770; }
+  #loginStatus { margin-top: 1rem; min-height: 1.2em; color: #606770; white-space: pre-wrap; }
+  #loginStatus.error { color: #c0392b; }
+
+  /* --- app layout --- */
+  #appView { display: none; height: 100vh; grid-template-columns: 320px 1fr; }
+  aside { background: #fff; border-right: 1px solid #dddfe2; display: flex;
+          flex-direction: column; min-height: 0; }
+  aside header { padding: 1rem; border-bottom: 1px solid #e4e6eb; display: flex;
+                 align-items: center; gap: .6rem; }
+  .avatar { width: 40px; height: 40px; border-radius: 50%; background: #0084ff; color: #fff;
+            display: flex; align-items: center; justify-content: center; font-weight: 700;
+            flex: none; }
+  .avatar.small { width: 34px; height: 34px; font-size: .9rem; background: #8a8d91; }
+  aside header .who { flex: 1; min-width: 0; }
+  aside header .who b { display: block; }
+  aside header .who span { color: #606770; font-size: .85rem; }
+  aside section { padding: .8rem 1rem; border-bottom: 1px solid #e4e6eb; overflow-y: auto; }
+  aside section.grow { flex: 1; }
+  aside h3 { margin: .2rem 0 .6rem; font-size: .95rem; color: #444950; }
+  .item { display: flex; align-items: center; gap: .55rem; padding: .5rem .4rem;
+          border-radius: 10px; cursor: pointer; }
+  .item:hover { background: #f0f2f5; }
+  .item.active { background: #e7f3ff; }
+  .item .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+                white-space: nowrap; }
+  .item .meta { color: #606770; font-size: .8rem; }
+  .badge { font-size: .75rem; background: #e4e6eb; border-radius: 999px; padding: .1rem .55rem; }
+  .badge.unread { background: #ff3b30; color: #fff; font-weight: 700; }
+  .groupbox { display: flex; gap: .4rem; margin-top: .5rem; }
+  .empty { color: #8a8d91; padding: .4rem; }
+
+  main { display: flex; flex-direction: column; min-width: 0; }
+  main header { background: #fff; border-bottom: 1px solid #dddfe2; padding: .8rem 1rem;
+                display: flex; align-items: center; gap: .6rem; }
+  main header .title { flex: 1; }
+  main header .title b { display: block; font-size: 1.05rem; }
+  main header .title span { color: #606770; font-size: .85rem; }
+  #statusLine { padding: .35rem 1rem; color: #606770; font-size: .85rem; background: #f7f8fa;
+                border-bottom: 1px solid #e4e6eb; min-height: 1.6em; }
+  #roomPanel { display: none; background: #fff; border-bottom: 1px solid #dddfe2;
+               padding: .8rem 1rem; max-height: 46vh; overflow-y: auto; }
+  #roomPanel h3 { margin: .2rem 0 .5rem; }
+  #roomPanel h4 { margin: .9rem 0 .4rem; color: #444950; }
+  #roomPanel .rowline { display: flex; gap: .4rem; margin-top: .4rem; }
+  #roomPanel .rowline input { flex: 1; }
+  button.danger { background: #fde8e8; color: #c0392b; }
+  #messages { flex: 1; overflow-y: auto; padding: 1rem; display: flex;
+              flex-direction: column; gap: .45rem; }
+  .bubble { max-width: 65%; padding: .55rem .8rem; border-radius: 16px; line-height: 1.45;
+            overflow-wrap: anywhere; white-space: pre-wrap; }
+  .bubble .sender { display: block; font-size: .78rem; font-weight: 700; margin-bottom: .15rem; }
+  .bubble .seq { display: block; font-size: .7rem; opacity: .65; margin-top: .2rem; text-align: right; }
+  .bubble.other { align-self: flex-start; background: #fff; border: 1px solid #e4e6eb; border-bottom-left-radius: 4px; }
+  .bubble.mine { align-self: flex-end; background: #0084ff; color: #fff; border-bottom-right-radius: 4px; }
+  .notice { align-self: center; color: #606770; font-size: .85rem; background: #e9ebee;
+            padding: .25rem .8rem; border-radius: 999px; }
+  #placeholder { margin: auto; color: #8a8d91; text-align: center; }
+  form#composer { display: flex; gap: .5rem; padding: .8rem; background: #fff;
+                  border-top: 1px solid #dddfe2; }
+  form#composer input[type="text"] { flex: 1; }
+  .bubble.deleted { background: #f0f2f5 !important; color: #8a8d91 !important;
+                    font-style: italic; border: 1px dashed #ccd0d5; }
+  .bubble .del { display: block; margin-top: .25rem; font-size: .72rem; padding: .1rem .5rem;
+                 background: rgba(0,0,0,.14); color: inherit; border-radius: 999px; }
+  .bubble .filecard { display: flex; flex-direction: column; gap: .3rem; }
+  .bubble .filecard b { overflow-wrap: anywhere; }
+  .bubble .filecard .meta { font-size: .78rem; opacity: .75; }
+  .bubble .filecard img { max-width: 240px; max-height: 240px; border-radius: 10px; }
+  .bubble .filecard button { align-self: flex-start; background: rgba(0,0,0,.14); color: inherit; }
+  #emojiPanel button { font-size: 1.35rem; background: transparent; padding: .2rem .35rem; }
+  #emojiPanel button:hover { background: #f0f2f5; }
+  @media (max-width: 720px) {
+    #appView { grid-template-columns: 1fr; }
+    aside { display: none; }
+    body.in-room aside { display: none; }
+    body:not(.in-room) aside { display: flex; }
+    body:not(.in-room) main { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div id="loginView">
+  <div class="card">
+    <h1>0xMP</h1>
+    <p class="sub">이름만 정하면 바로 시작할 수 있습니다.</p>
+    <label for="nameInput">사용할 이름</label>
+    <input type="text" id="nameInput" placeholder="예: alice" autocomplete="off">
+    <button class="primary" id="startBtn">채팅 시작하기</button>
+    <div id="loginStatus"></div>
+    <details class="advanced">
+      <summary>고급 설정 (서버 주소 · 기존 계정으로 접속)</summary>
+      <label for="url">서버 URL</label>
+      <input type="text" id="url" value="ws://127.0.0.1:8765">
+      <label for="api">API URL</label>
+      <input type="text" id="api" value="http://127.0.0.1:8770">
+      <label for="creds">자격증명 JSON으로 접속</label>
+      <textarea id="creds" rows="4" placeholder='{"access_token":"...","device_id":"...","device_private_key_raw":"...","device_public_key":"..."}'></textarea>
+      <button id="credsBtn" style="margin-top:.6rem">이 자격증명으로 접속</button>
+      <button id="clearBtn" style="margin-top:.6rem">저장된 계정 지우기</button>
+      <p style="color:#606770;font-size:.85rem">운영 환경에서는 반드시 <code>wss://</code>(TLS 1.3)를 사용하세요.
+      계정은 이 브라우저에 저장되어, 같은 이름이면 새로 만들지 않고 이어서 접속합니다.</p>
+    </details>
+  </div>
+</div>
+
+<div id="appView">
+  <aside>
+    <header>
+      <div class="avatar" id="meAvatar">?</div>
+      <div class="who"><b id="meName">-</b><span id="connState">연결됨</span></div>
+      <button id="refreshBtn" title="목록 새로고침">새로고침</button>
+      <button id="logoutBtn" class="danger" title="이 기기의 세션을 삭제하고 로그아웃">로그아웃</button>
+    </header>
+    <section class="grow">
+      <h3>대화</h3>
+      <div id="rooms"></div>
+      <h3 style="margin-top:1.1rem">친구</h3>
+      <input type="text" id="friendSearch" placeholder="친구 이름 검색" autocomplete="off"
+             style="margin-bottom:.4rem">
+      <div id="users"></div>
+      <div class="groupbox">
+        <input type="text" id="groupTitle" placeholder="그룹 이름">
+        <button id="createGroupBtn">그룹 만들기</button>
+      </div>
+      <p class="meta" style="color:#8a8d91;font-size:.8rem">친구를 체크한 뒤 그룹을 만드세요. 이름 옆 버튼은 1:1 대화입니다.</p>
+      <details style="margin-top:.9rem">
+        <summary style="cursor:pointer;color:#606770">친구 추가 (전체 사용자에서 찾기)</summary>
+        <input type="text" id="dirSearch" placeholder="추가할 사용자 이름 검색" autocomplete="off"
+               style="margin:.4rem 0">
+        <div id="directory"></div>
+      </details>
+    </section>
+  </aside>
+  <main>
+    <header>
+      <div class="title"><b id="currentTitle">대화를 선택하세요</b><span id="currentMeta"></span></div>
+      <button id="headerRenameBtn" style="display:none">이름 변경</button>
+      <button id="infoBtn">방 정보</button>
+      <button id="syncBtn">동기화</button>
+      <button id="leaveBtn">닫기</button>
+      <button id="exitRoomBtn" class="danger" style="display:none">방 나가기</button>
+    </header>
+    <div id="roomPanel">
+      <h3>방 정보</h3>
+      <div id="panelMembers"></div>
+      <h4>멤버 초대</h4>
+      <div id="panelInvite"></div>
+      <div id="convertBox">
+        <h4>그룹으로 전환</h4>
+        <p style="color:#606770;font-size:.9rem">초대할 사용자를 고르면, 지금 상대와 초대할 사람이 함께 들어가는 새 그룹이 만들어집니다. (기존 1:1 방은 그대로 남습니다)</p>
+        <div id="convertList"></div>
+        <div class="rowline">
+          <input type="text" id="convertTitle" placeholder="새 그룹 이름 (비우면 자동)">
+          <button class="primary" id="convertBtn">그룹으로 전환</button>
+        </div>
+      </div>
+      <div id="groupBox">
+        <h4>그룹 설정</h4>
+        <div class="rowline">
+          <input type="text" id="renameTitle" placeholder="새 그룹 이름">
+          <button id="renameBtn">이름 변경</button>
+        </div>
+        <div class="rowline">
+          <button class="danger" id="leaveRoomBtn">대화방 나가기 (멤버 탈퇴)</button>
+        </div>
+      </div>
+      <div id="dangerBox">
+        <h4>메시지 관리</h4>
+        <div class="rowline">
+          <button class="danger" id="clearBtn2">이 방의 모든 메시지 전체 삭제</button>
+        </div>
+        <p style="color:#606770;font-size:.85rem">전체 삭제는 모든 멤버에게 적용되며 되돌릴 수 없습니다.
+        그룹방은 방장만, 1:1 방은 양쪽 모두 실행할 수 있습니다. 개별 메시지는 내 말풍선의 [삭제] 버튼으로 지웁니다.</p>
+      </div>
+    </div>
+    <div id="statusLine"></div>
+    <div id="messages"><div id="placeholder">왼쪽에서 대화를 고르거나<br>사용자와 새 대화를 시작하세요.</div></div>
+    <div id="emojiPanel" style="display:none;background:#fff;border-top:1px solid #dddfe2;
+         padding:.6rem .8rem;max-height:180px;overflow-y:auto"></div>
+    <form id="composer">
+      <button type="button" id="emojiBtn" title="이모지" disabled>😀</button>
+      <button type="button" id="fileBtn" title="파일 보내기" disabled>📎</button>
+      <input type="file" id="fileInput" style="display:none">
+      <input type="text" id="textInput" placeholder="메시지를 입력하세요" autocomplete="off" disabled>
+      <button class="primary" id="sendBtn" type="submit" disabled>전송</button>
+    </form>
+  </main>
+</div>
+
+<script type="module">
+import {
+  FrameType, decodeDeleteEvent, decodeError, decodeFrame, decodeHelloResult,
+  decodeAuthResult, decodeMessageIncoming, decodeSyncBatch, encodeAuth,
+  encodeDeleteEvent, encodeDeliveryAck, encodeFrame, encodeHello,
+  encodeMessageSend, encodeSyncRequest, encodeSyncAck, fromHex, toHex,
+  uuidBytes,
+} from "./oxmp.js";
+
+const $ = (id) => document.getElementById(id);
+const b64url = (bytes) => btoa(String.fromCharCode(...bytes))
+  .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const esc = (s) => s.replace(/[&<>"']/g, (c) => ({
+  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+let ws = null, creds = null, conversation = null, cursor = 0;
+let currentRoom = null, usersById = new Map(), roomsCache = [], allUsers = [];
+let friendsCache = []; // only friends are shown in the sidebar list
+const unread = new Map(); // conversation_id (hex) -> unread count
+const seenMessages = new Set(); // message_id hex already shown (dedupe)
+const pendingOutbox = [];       // sends queued while disconnected
+let myName = "", intentionalClose = false, reconnectTimer = null;
+let reconnectAttempts = 0, heartbeatTimer = null, lastPongAt = 0;
+let syncInFlight = false, autoSyncTimer = null;
+const resolvers = new Map(), inbox = new Map();
+
+const loginStatus = (msg, isError = false) => {
+  $("loginStatus").textContent = msg;
+  $("loginStatus").className = isError ? "error" : "";
+};
+const status = (msg) => { $("statusLine").textContent = msg; };
+function notice(msg) {
+  const el = document.createElement("div");
+  el.className = "notice";
+  el.textContent = msg;
+  $("messages").append(el);
+  $("messages").scrollTop = 1e9;
+}
+const KIND_TEXT = 1, KIND_MEDIA = 2;
+function formatBytes(n) {
+  if (n < 1024) return n + " B";
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
+  return (n / 1024 / 1024).toFixed(1) + " MB";
+}
+async function fetchMediaBlob(mediaIdHex) {
+  const resp = await fetch($("api").value + "/v1/media/" + mediaIdHex + "/content", {
+    headers: { Authorization: "Bearer " + creds.access_token } });
+  if (!resp.ok) throw new Error("파일 다운로드 실패 (" + resp.status + ")");
+  return resp.blob();
+}
+async function downloadMedia(ref) {
+  try {
+    const blob = await fetchMediaBlob(ref.media_id);
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = ref.name || "file";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  } catch (err) { status(err.message); }
+}
+function fileCard(ref) {
+  const wrap = document.createElement("div");
+  wrap.className = "filecard";
+  const title = document.createElement("b");
+  title.textContent = "📎 " + (ref.name || "이름 없는 파일");
+  const meta = document.createElement("span");
+  meta.className = "meta";
+  meta.textContent = (ref.content_type || "파일") + " · " + formatBytes(ref.size || 0);
+  wrap.append(title, meta);
+  if ((ref.content_type || "").startsWith("image/")) {
+    const img = document.createElement("img");
+    img.alt = ref.name || "image";
+    fetchMediaBlob(ref.media_id)
+      .then((blob) => { img.src = URL.createObjectURL(blob); })
+      .catch(() => { meta.textContent += " · 미리보기를 불러오지 못했습니다"; });
+    wrap.append(img);
+  }
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.textContent = "다운로드";
+  btn.onclick = () => downloadMedia(ref);
+  wrap.append(btn);
+  return wrap;
+}
+function bubble(msg) {
+  if (msg.messageId) {
+    const key = toHex(msg.messageId);
+    if (seenMessages.has(key)) return; // already shown (e.g. re-sync after reconnect)
+    seenMessages.add(key);
+  }
+  const mine = msg.senderId && toHex(msg.senderId) === creds.user_id;
+  const el = document.createElement("div");
+  el.className = "bubble " + (mine ? "mine" : "other");
+  if (msg.messageId) el.dataset.messageId = toHex(msg.messageId);
+  const sender = mine ? "나" : (usersById.get(toHex(msg.senderId || new Uint8Array())) || "상대");
+  if (!mine) {
+    const name = document.createElement("span");
+    name.className = "sender";
+    name.textContent = sender;
+    el.append(name);
+  }
+  if ((msg.kind || KIND_TEXT) === KIND_MEDIA) {
+    let ref = null;
+    try { ref = JSON.parse(new TextDecoder().decode(msg.body)); } catch { /* fall through */ }
+    if (ref && ref.media_id) el.append(fileCard(ref));
+    else el.append(document.createTextNode(new TextDecoder().decode(msg.body)));
+  } else {
+    el.append(document.createTextNode(new TextDecoder().decode(msg.body)));
+  }
+  const seq = document.createElement("span");
+  seq.className = "seq";
+  seq.textContent = "#" + msg.sequence;
+  el.append(seq);
+  if (mine && msg.messageId) {
+    const del = document.createElement("button");
+    del.type = "button";
+    del.className = "del";
+    del.textContent = "삭제";
+    del.title = "이 메시지를 모두에게 삭제";
+    del.onclick = () => {
+      if (!confirm("이 메시지를 삭제할까요? 모든 멤버에게 삭제됩니다.")) return;
+      sendFrame(FrameType.MESSAGE_DELETE, encodeDeleteEvent({
+        messageId: msg.messageId, conversationId: conversation }));
+    };
+    el.append(del);
+  }
+  $("messages").append(el);
+  $("messages").scrollTop = 1e9;
+}
+function markDeleted(messageIdBytes) {
+  // Converge one bubble to its tombstone state (idempotent).
+  const el = $("messages").querySelector(
+    `[data-message-id="${toHex(messageIdBytes)}"]`);
+  if (!el) return;
+  el.className = "bubble deleted";
+  el.innerHTML = "삭제된 메시지입니다";
+}
+function clearMessagesView(noteText) {
+  $("messages").innerHTML = "";
+  seenMessages.clear();
+  if (noteText) notice(noteText);
+}
+
+/* ---------- transport ---------- */
+function dispatch(frame) {
+  const waiting = resolvers.get(frame.type);
+  if (waiting && waiting.length) { waiting.shift()(frame); return; }
+  const queued = inbox.get(frame.type) || [];
+  queued.push(frame);
+  inbox.set(frame.type, queued);
+}
+function nextFrame(type) {
+  const queued = inbox.get(type);
+  if (queued && queued.length) return Promise.resolve(queued.shift());
+  return new Promise((resolve) => {
+    const waiting = resolvers.get(type) || [];
+    waiting.push(resolve);
+    resolvers.set(type, waiting);
+  });
+}
+function sendFrame(type, payload, flags = 0) { ws.send(encodeFrame(type, payload, flags)); }
+async function request(type, payload, expect, flags = 0) {
+  sendFrame(type, payload, flags);
+  return nextFrame(expect);
+}
+async function api(path, method = "GET", body = null, withAuth = true) {
+  const headers = { "Content-Type": "application/json" };
+  if (withAuth && creds) headers["Authorization"] = "Bearer " + creds.access_token;
+  const resp = await fetch($("api").value + path, {
+    method, headers, body: body ? JSON.stringify(body) : null });
+  if (!resp.ok) throw new Error("API " + resp.status);
+  return resp.json();
+}
+async function deviceKey() {
+  const jwk = { kty: "OKP", crv: "Ed25519",
+    x: b64url(fromHex(creds.device_public_key)),
+    d: b64url(fromHex(creds.device_private_key_raw)) };
+  return crypto.subtle.importKey("jwk", jwk, { name: "Ed25519" }, false, ["sign"]);
+}
+
+/* ---------- account handling ---------- */
+const storeKey = (name) => "oxmp.creds." + name;
+function saveCreds(name, value) {
+  localStorage.setItem(storeKey(name), JSON.stringify(value));
+  localStorage.setItem("oxmp.lastName", name);
+}
+function loadCreds(name) {
+  try { return JSON.parse(localStorage.getItem(storeKey(name)) || "null"); }
+  catch { return null; }
+}
+async function issueAccount(name) {
+  const issued = await api("/v1/accounts", "POST", { name }, false);
+  saveCreds(name, issued);
+  return issued;
+}
+async function refreshCreds(name) {
+  const resp = await fetch($("api").value + "/v1/auth/refresh", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refresh_token: creds.refresh_token }) });
+  if (!resp.ok) throw new Error("refresh " + resp.status);
+  const fresh = await resp.json();
+  creds = { ...creds, access_token: fresh.access_token,
+            refresh_token: fresh.refresh_token };
+  saveCreds(name, creds);
+  return creds;
+}
+
+/* ---------- connect / reconnect ---------- */
+function setConnState(text) {
+  const el = $("connState");
+  if (el) el.textContent = text;
+}
+function startHeartbeat() {
+  stopHeartbeat();
+  lastPongAt = Date.now();
+  heartbeatTimer = setInterval(() => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    if (Date.now() - lastPongAt > 60000) { ws.close(); return; }
+    sendFrame(FrameType.PING, new Uint8Array());
+  }, 25000);
+}
+function stopHeartbeat() {
+  if (heartbeatTimer) clearInterval(heartbeatTimer);
+  heartbeatTimer = null;
+}
+function scheduleReconnect() {
+  if (intentionalClose || reconnectTimer) return;
+  if ($("appView").style.display !== "grid") return; // not signed in yet
+  const delay = Math.min(1000 * 2 ** reconnectAttempts, 10000);
+  reconnectAttempts += 1;
+  setConnState(`재연결 중... (${reconnectAttempts}번째, ${Math.round(delay / 1000)}초 후)`);
+  status(`연결이 끊겼습니다. ${Math.round(delay / 1000)}초 뒤 자동으로 다시 연결합니다.`);
+  reconnectTimer = setTimeout(async () => {
+    reconnectTimer = null;
+    try {
+      await connect(myName);
+      reconnectAttempts = 0;
+      setConnState("연결됨");
+      startHeartbeat();
+      status("다시 연결됐습니다. 놓친 메시지를 동기화합니다.");
+      await refreshLobby().catch(() => {});
+      if (currentRoom) await syncRoom().catch(() => {});
+      flushOutbox();
+    } catch {
+      scheduleReconnect();
+    }
+  }, delay);
+}
+function flushOutbox() {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  while (pendingOutbox.length) {
+    const pending = pendingOutbox.shift();
+    ws.send(encodeFrame(FrameType.MESSAGE_SEND, pending.payload, 0x0008));
+  }
+}
+async function connectOnce() {
+  ws = new WebSocket($("url").value);
+  ws.binaryType = "arraybuffer";
+  ws.onclose = () => { stopHeartbeat(); scheduleReconnect(); };
+  ws.onmessage = (event) => {
+    if (decodeFrame(new Uint8Array(event.data)).type === FrameType.PONG) {
+      lastPongAt = Date.now();
+      return;
+    }
+    const frame = decodeFrame(new Uint8Array(event.data));
+    if (frame.type === FrameType.MESSAGE_INCOMING) {
+      const msg = decodeMessageIncoming(frame.payload);
+      const sameRoom = conversation && msg.conversationId
+        && toHex(msg.conversationId) === toHex(conversation);
+      if (sameRoom) { bubble(msg); cursor = Math.max(cursor, msg.sequence); }
+      else {
+        const cid = msg.conversationId ? toHex(msg.conversationId) : "";
+        if (cid) unread.set(cid, (unread.get(cid) || 0) + 1);
+        status("새 메시지가 도착했습니다. 왼쪽 대화 목록에서 방을 클릭하세요.");
+        notice("새 메시지가 도착했습니다.");
+        refreshLobby().catch(() => {});
+      }
+      sendFrame(FrameType.MESSAGE_DELIVERY_ACK, encodeDeliveryAck({
+        messageId: msg.messageId, conversationId: msg.conversationId,
+        sequence: msg.sequence }));
+      return;
+    }
+    if (frame.type === FrameType.MESSAGE_DELETE) {
+      const del = decodeDeleteEvent(frame.payload);
+      const sameRoom = conversation && del.conversationId
+        && toHex(del.conversationId) === toHex(conversation);
+      if (sameRoom) {
+        if (del.messageId && del.messageId.length) {
+          markDeleted(del.messageId);
+          status("메시지가 삭제됐습니다.");
+        } else {
+          clearMessagesView("이 방의 모든 메시지가 삭제됐습니다.");
+          status("대화 내용이 전체 삭제됐습니다.");
+        }
+      } else {
+        refreshLobby().catch(() => {});
+      }
+      return;
+    }
+    if (frame.type === FrameType.MESSAGE_ACCEPTED) { status("전송됨 · 서버에 저장됐습니다."); return; }
+    if (frame.type === FrameType.ERROR) {
+      const err = decodeError(frame.payload);
+      status(`오류 0x${err.code.toString(16)}: ${err.message}`);
+      return;
+    }
+    dispatch(frame);
+  };
+  await new Promise((resolve, reject) => { ws.onopen = resolve; ws.onerror = reject; });
+  const helloFrame = await request(FrameType.HELLO,
+    encodeHello({ protocolId: "0xmp.v1", maxProfile: 2,
+                  clientName: "web", clientVersion: "0.5" }),
+    FrameType.HELLO_RESULT);
+  const hello = decodeHelloResult(helloFrame.payload);
+  const signature = new Uint8Array(await crypto.subtle.sign(
+    { name: "Ed25519" }, await deviceKey(),
+    new TextEncoder().encode(hello.sessionId)));
+  const authFrame = await request(FrameType.AUTH, encodeAuth({
+    accessToken: creds.access_token,
+    deviceId: fromHex(creds.device_id), signature,
+  }), FrameType.AUTH_RESULT);
+  return decodeAuthResult(authFrame.payload).ok;
+}
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("연결 시간 초과")), ms)),
+  ]);
+}
+async function connect(name) {
+  myName = name;
+  if (await withTimeout(connectOnce(), 10000)) { startHeartbeat(); return; }
+  if (creds.refresh_token) {           // access token likely expired
+    await refreshCreds(name);
+    if (await withTimeout(connectOnce(), 10000)) { startHeartbeat(); return; }
+  }
+  throw new Error("인증에 실패했습니다. 서버가 켜져 있는지 확인하세요.");
+}
+function startAutoSync() {
+  if (autoSyncTimer) return;
+  autoSyncTimer = setInterval(() => {
+    if (ws && ws.readyState === WebSocket.OPEN && currentRoom) syncRoom().catch(() => {});
+  }, 15000);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") return;
+    if (!ws || ws.readyState !== WebSocket.OPEN) scheduleReconnect();
+    else if (currentRoom) syncRoom().catch(() => {});
+  });
+  window.addEventListener("online", () => scheduleReconnect());
+}
+function enterApp(name) {
+  $("loginView").style.display = "none";
+  $("appView").style.display = "grid";
+  $("meName").textContent = name;
+  $("meAvatar").textContent = (name || "?").slice(0, 1).toUpperCase();
+  status("연결됐습니다.");
+}
+
+/* ---------- lobby ---------- */
+function roomTitle(info) {
+  if (info.title) return info.title;
+  const others = info.members.filter((m) => m.user_id !== creds.user_id);
+  return info.kind === "direct"
+    ? (others[0] ? others[0].name : "1:1 대화")
+    : others.map((m) => m.name).join(", ") || "그룹 대화";
+}
+let friendQuery = "", dirQuery = "";
+const matchesQuery = (name, q) =>
+  !q || (name || "").toLowerCase().includes(q.toLowerCase());
+
+function renderFriendList() {
+  // Sidebar shows ONLY friends, narrowed by the search box when typed.
+  const usersEl = $("users");
+  const shown = friendsCache.filter((f) => matchesQuery(f.name, friendQuery));
+  usersEl.innerHTML = "";
+  if (!friendsCache.length) {
+    usersEl.innerHTML = '<div class="empty">아직 친구가 없습니다.<br>아래 "친구 추가"에서 사용자를 친구로 추가하세요.</div>';
+    return;
+  }
+  if (!shown.length) {
+    usersEl.innerHTML = '<div class="empty">검색 결과가 없습니다.</div>';
+    return;
+  }
+  for (const f of shown) {
+    const row = document.createElement("div");
+    row.className = "item";
+    const check = document.createElement("input");
+    check.type = "checkbox";
+    check.dataset.userId = f.user_id; check.className = "member-check";
+    const avatar = document.createElement("div");
+    avatar.className = "avatar small";
+    avatar.textContent = (f.name || "?").slice(0, 1).toUpperCase();
+    const name = document.createElement("span");
+    name.className = "name";
+    name.textContent = f.name;
+    const direct = document.createElement("button");
+    direct.textContent = "1:1";
+    direct.onclick = async () => enterRoom(
+      await api("/v1/conversations/direct", "POST", { user_id: f.user_id }));
+    const del = document.createElement("button");
+    del.className = "danger";
+    del.textContent = "삭제";
+    del.title = "친구 삭제";
+    del.onclick = async () => {
+      await api("/v1/friends/remove", "POST", { user_id: f.user_id });
+      status(`${f.name}님을 친구에서 삭제했습니다.`);
+      await refreshLobby();
+      if (currentRoom) renderPanel();
+    };
+    row.append(check, avatar, name, direct, del);
+    usersEl.append(row);
+  }
+}
+
+function renderDirectory() {
+  // Directory (friend-add area): users who are not me / not friends yet.
+  const dirEl = $("directory");
+  const friendIds = new Set(friendsCache.map((f) => f.user_id));
+  const strangers = allUsers.filter((u) =>
+    !u.is_self && !friendIds.has(u.user_id) && matchesQuery(u.name, dirQuery));
+  dirEl.innerHTML = "";
+  if (!strangers.length) {
+    dirEl.innerHTML = '<div class="empty">추가할 수 있는 사용자가 없습니다.</div>';
+    return;
+  }
+  for (const u of strangers) {
+    const add = document.createElement("button");
+    add.className = "primary";
+    add.textContent = "친구 추가";
+    add.onclick = async () => {
+      await api("/v1/friends", "POST", { user_id: u.user_id });
+      status(`${u.name}님을 친구로 추가했습니다.`);
+      await refreshLobby();
+      if (currentRoom) renderPanel();
+    };
+    dirEl.append(memberRow(u.user_id, u.name, add));
+  }
+}
+
+async function refreshLobby() {
+  const [{ users }, { conversations }, { friends }] = await Promise.all([
+    api("/v1/users"), api("/v1/conversations"), api("/v1/friends")]);
+  usersById = new Map(users.map((u) => [u.user_id, u.name]));
+  roomsCache = conversations;
+  allUsers = users;
+  friendsCache = friends;
+
+  renderFriendList();
+  renderDirectory();
+
+  const roomsEl = $("rooms");
+  roomsEl.innerHTML = conversations.length ? "" : '<div class="empty">아직 대화가 없습니다.</div>';
+  for (const info of conversations) {
+    const row = document.createElement("div");
+    row.className = "item" + (currentRoom
+      && info.conversation_id === currentRoom.conversation_id ? " active" : "");
+    const avatar = document.createElement("div");
+    avatar.className = "avatar small";
+    avatar.textContent = roomTitle(info).slice(0, 1).toUpperCase();
+    const name = document.createElement("span");
+    name.className = "name";
+    name.textContent = roomTitle(info);
+    const badge = document.createElement("span");
+    badge.className = "badge";
+    badge.textContent = info.kind === "direct" ? "1:1" : `${info.members.length}명`;
+    row.append(avatar, name, badge);
+    const count = unread.get(info.conversation_id) || 0;
+    if (count) {
+      const pill = document.createElement("span");
+      pill.className = "badge unread";
+      pill.textContent = count;
+      row.append(pill);
+    }
+    row.onclick = () => enterRoom(info);
+    roomsEl.append(row);
+  }
+}
+async function reloadCurrentRoom() {
+  const { conversations } = await api("/v1/conversations");
+  roomsCache = conversations;
+  const updated = conversations.find(
+    (c) => currentRoom && c.conversation_id === currentRoom.conversation_id);
+  if (updated) {
+    currentRoom = updated;
+    $("currentTitle").textContent = roomTitle(updated);
+    $("currentMeta").textContent =
+      (updated.kind === "direct" ? "1:1 대화" : `그룹 · ${updated.members.length}명`);
+    $("headerRenameBtn").style.display =
+      updated.kind === "group" ? "" : "none";
+  }
+  renderPanel();
+  return updated;
+}
+
+function memberRow(userId, name, extra) {
+  const row = document.createElement("div");
+  row.className = "item";
+  const avatar = document.createElement("div");
+  avatar.className = "avatar small";
+  avatar.textContent = (name || "?").slice(0, 1).toUpperCase();
+  const label = document.createElement("span");
+  label.className = "name";
+  label.textContent = name + (userId === creds.user_id ? " (나)" : "");
+  row.append(avatar, label);
+  if (extra) row.append(extra);
+  return row;
+}
+
+function renderPanel() {
+  const panel = $("roomPanel");
+  if (!currentRoom) { panel.style.display = "none"; return; }
+  const memberIds = new Set(currentRoom.members.map((m) => m.user_id));
+  const isGroup = currentRoom.kind === "group";
+  const iAmCreator = currentRoom.created_by === creds.user_id;
+
+  const membersEl = $("panelMembers");
+  membersEl.innerHTML = "";
+  for (const m of currentRoom.members) {
+    let action = null;
+    if (isGroup && iAmCreator && m.user_id !== creds.user_id) {
+      action = document.createElement("button");
+      action.className = "danger";
+      action.textContent = "내보내기";
+      action.onclick = async () => {
+        currentRoom = await api(
+          `/v1/conversations/${currentRoom.conversation_id}/remove`,
+          "POST", { user_id: m.user_id });
+        notice(`${m.name}님을 내보냈습니다.`);
+        await reloadCurrentRoom();
+        await refreshLobby();
+      };
+    }
+    const tags = document.createElement("span");
+    tags.className = "badge";
+    tags.textContent = currentRoom.created_by === m.user_id ? "방장" : "";
+    membersEl.append(memberRow(m.user_id, m.name, action || (tags.textContent ? tags : null)));
+  }
+
+  const inviteEl = $("panelInvite");
+  inviteEl.innerHTML = "";
+  // Invite candidates: friends who are not members yet.
+  const candidates = friendsCache.filter((u) => !memberIds.has(u.user_id));
+  if (!candidates.length) inviteEl.innerHTML = '<div class="empty">초대할 수 있는 친구가 없습니다. (친구만 초대할 수 있습니다)</div>';
+  for (const u of candidates) {
+    const btn = document.createElement("button");
+    btn.className = "primary";
+    btn.textContent = "초대";
+    btn.onclick = async () => {
+      currentRoom = await api(
+        `/v1/conversations/${currentRoom.conversation_id}/members`,
+        "POST", { user_id: u.user_id });
+      notice(`${u.name}님을 초대했습니다.`);
+      await reloadCurrentRoom();
+      await refreshLobby();
+    };
+    inviteEl.append(memberRow(u.user_id, u.name, btn));
+  }
+
+  $("convertBox").style.display = isGroup ? "none" : "block";
+  $("groupBox").style.display = isGroup ? "block" : "none";
+  if (!isGroup) {
+    const otherIds = new Set(currentRoom.members.map((m) => m.user_id));
+    const list = $("convertList");
+    list.innerHTML = "";
+    // Conversion candidates: friends who are not in this direct room yet.
+    const targets = friendsCache.filter((u) => !otherIds.has(u.user_id));
+    if (!targets.length) list.innerHTML = '<div class="empty">초대할 수 있는 친구가 없습니다. (친구만 초대할 수 있습니다)</div>';
+    for (const u of targets) {
+      const check = document.createElement("input");
+      check.type = "checkbox";
+      check.className = "convert-check";
+      check.dataset.userId = u.user_id;
+      const row = memberRow(u.user_id, u.name, null);
+      row.prepend(check);
+      list.append(row);
+    }
+    // Suggest a group name from the participants; still editable afterwards
+    // from the header "이름 변경" button or the room panel.
+    const others = currentRoom.members
+      .filter((m) => m.user_id !== creds.user_id).map((m) => m.name);
+    $("convertTitle").value = [...others, myName].filter(Boolean).join(", ");
+    $("renameTitle").value = "";
+  }
+}
+
+async function enterRoom(info) {
+  currentRoom = info;
+  unread.delete(info.conversation_id);
+  conversation = fromHex(info.conversation_id);
+  cursor = 0;
+  document.body.classList.add("in-room");
+  $("currentTitle").textContent = roomTitle(info);
+  $("currentMeta").textContent =
+    (info.kind === "direct" ? "1:1 대화" : `그룹 · ${info.members.length}명`);
+  $("headerRenameBtn").style.display = info.kind === "group" ? "" : "none";
+  $("exitRoomBtn").style.display = "";
+  $("messages").innerHTML = "";
+  seenMessages.clear();
+  $("textInput").disabled = false;
+  $("emojiBtn").disabled = false;
+  $("fileBtn").disabled = false;
+  $("sendBtn").disabled = false;
+  $("roomPanel").style.display = "none";
+  await refreshLobby().catch(() => {});
+  renderPanel();
+  await syncRoom();
+}
+async function syncRoom() {
+  if (!conversation) { status("먼저 대화를 선택하세요."); return; }
+  if (syncInFlight) return;
+  syncInFlight = true;
+  try {
+  const frame = await request(FrameType.SYNC_REQUEST, encodeSyncRequest({
+    conversationId: conversation, afterSequence: cursor, limit: 100,
+  }), FrameType.SYNC_BATCH);
+  const batch = decodeSyncBatch(frame.payload);
+  let shown = 0;
+  for (const ev of batch.events) {
+    if (ev.type === 3) {          // DELETE tombstone: converge, never render
+      if (ev.message) markDeleted(ev.message.messageId);
+    } else if (ev.message) { bubble(ev.message); shown += 1; }
+    cursor = Math.max(cursor, ev.sequence);
+  }
+  sendFrame(FrameType.SYNC_ACK, encodeSyncAck({
+    conversationId: conversation, appliedSequence: cursor }));
+  status(shown
+    ? `동기화 완료 · ${shown}건을 받았습니다.`
+    : "동기화 완료 · 새 메시지가 없습니다. 최신 상태입니다.");
+  } finally {
+    syncInFlight = false;
+  }
+}
+
+/* ---------- events ---------- */
+$("startBtn").onclick = async () => {
+  const name = $("nameInput").value.trim();
+  if (!name) { loginStatus("이름을 입력하세요.", true); return; }
+  loginStatus("접속 중...");
+  try {
+    creds = loadCreds(name) || await issueAccount(name);
+    await connect(name);
+    enterApp(name);
+    startAutoSync();
+    await refreshLobby();
+  } catch (err) {
+    loginStatus("접속 실패: " + err.message +
+      "\n서버(python -m server.main)가 실행 중인지 확인하세요.", true);
+  }
+};
+$("nameInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") $("startBtn").click();
+});
+$("credsBtn").onclick = async () => {
+  try { creds = JSON.parse($("creds").value); }
+  catch (err) { loginStatus("자격증명 JSON이 잘못됐습니다: " + err.message, true); return; }
+  try {
+    await connect($("nameInput").value.trim() || "web-user");
+    enterApp($("nameInput").value.trim() || "web-user");
+    startAutoSync();
+    await refreshLobby();
+  } catch (err) { loginStatus("접속 실패: " + err.message, true); }
+};
+$("clearBtn").onclick = () => {
+  const name = $("nameInput").value.trim();
+  if (name) localStorage.removeItem(storeKey(name));
+  loginStatus("저장된 계정을 지웠습니다.");
+};
+$("refreshBtn").onclick = () => refreshLobby();
+$("friendSearch").addEventListener("input", (e) => {
+  friendQuery = e.target.value.trim();
+  renderFriendList();
+});
+$("dirSearch").addEventListener("input", (e) => {
+  dirQuery = e.target.value.trim();
+  renderDirectory();
+});
+$("logoutBtn").onclick = async () => {
+  if (!confirm("로그아웃할까요?\n이 기기의 세션(토큰)이 서버에서 삭제되고, 이 브라우저에 저장된 계정 정보도 지워집니다.")) return;
+  intentionalClose = true;              // no auto-reconnect after this
+  stopHeartbeat();
+  if (autoSyncTimer) { clearInterval(autoSyncTimer); autoSyncTimer = null; }
+  try { await api("/v1/auth/logout", "POST", {}); } catch { /* already gone */ }
+  try { if (ws) ws.close(); } catch { /* ignore */ }
+  const name = myName || localStorage.getItem("oxmp.lastName");
+  if (name) localStorage.removeItem(storeKey(name));
+  localStorage.removeItem("oxmp.lastName");
+  location.reload();
+};
+$("createGroupBtn").onclick = async () => {
+  const picked = [...document.querySelectorAll(".member-check:checked")]
+    .map((el) => el.dataset.userId);
+  if (!picked.length) { status("그룹에 넣을 사용자를 체크하세요."); return; }
+  const info = await api("/v1/conversations", "POST", {
+    title: $("groupTitle").value || "", kind: "group", member_user_ids: picked });
+  await refreshLobby();
+  await enterRoom(info);
+};
+function exitRoomView(message) {
+  currentRoom = null; conversation = null; cursor = 0;
+  document.body.classList.remove("in-room");
+  $("roomPanel").style.display = "none";
+  $("headerRenameBtn").style.display = "none";
+  $("exitRoomBtn").style.display = "none";
+  $("emojiPanel").style.display = "none";
+  $("currentTitle").textContent = "대화를 선택하세요";
+  $("currentMeta").textContent = "";
+  $("messages").innerHTML = '<div id="placeholder">왼쪽에서 대화를 고르거나<br>사용자와 새 대화를 시작하세요.</div>';
+  $("textInput").disabled = true;
+  $("emojiBtn").disabled = true;
+  $("fileBtn").disabled = true;
+  $("sendBtn").disabled = true;
+  status(message);
+  refreshLobby().catch(() => {});
+}
+$("leaveBtn").onclick = () => exitRoomView("방을 닫았습니다. (대화 목록에는 그대로 있습니다)");
+$("infoBtn").onclick = () => {
+  if (!currentRoom) { status("먼저 대화를 선택하세요."); return; }
+  const panel = $("roomPanel");
+  panel.style.display = panel.style.display === "block" ? "none" : "block";
+  if (panel.style.display === "block") renderPanel();
+};
+$("convertBtn").onclick = async () => {
+  if (!currentRoom) return;
+  const picked = [...document.querySelectorAll(".convert-check:checked")]
+    .map((el) => el.dataset.userId);
+  if (!picked.length) { status("그룹에 초대할 사용자를 체크하세요."); return; }
+  const others = currentRoom.members
+    .filter((m) => m.user_id !== creds.user_id).map((m) => m.user_id);
+  const info = await api("/v1/conversations", "POST", {
+    title: $("convertTitle").value.trim() || "", kind: "group",
+    member_user_ids: [...others, ...picked] });
+  notice(`그룹 "${roomTitle(info)}"으로 전환했습니다. 이름은 상단의 [이름 변경] 버튼으로 언제든 바꿀 수 있습니다. 이전 1:1 대화는 목록에 그대로 남아 있습니다.`);
+  await refreshLobby();
+  await enterRoom(info);
+};
+$("headerRenameBtn").onclick = () => {
+  if (!currentRoom) return;
+  // Open the room panel and jump straight to the rename input.
+  $("roomPanel").style.display = "block";
+  renderPanel();
+  $("renameTitle").value = currentRoom.title || "";
+  $("renameTitle").focus();
+  $("renameTitle").select();
+};
+$("renameBtn").onclick = async () => {
+  if (!currentRoom) return;
+  const title = $("renameTitle").value.trim();
+  if (!title) { status("새 그룹 이름을 입력하세요."); return; }
+  currentRoom = await api(
+    `/v1/conversations/${currentRoom.conversation_id}/rename`,
+    "POST", { title });
+  $("currentTitle").textContent = roomTitle(currentRoom);
+  notice(`그룹 이름을 "${title}"(으)로 바꿨습니다.`);
+  await refreshLobby();
+  renderPanel();
+};
+async function leaveCurrentRoom() {
+  if (!currentRoom) return;
+  const title = roomTitle(currentRoom);
+  if (!confirm(`"${title}" 방에서 나갈까요?\n내 대화 목록에서 사라지고, 다시 초대받기 전에는 들어올 수 없습니다.`)) return;
+  try {
+    await api(`/v1/conversations/${currentRoom.conversation_id}/leave`, "POST", {});
+    exitRoomView("대화방에서 나갔습니다.");
+  } catch (err) { status("방 나가기에 실패했습니다: " + err.message); }
+}
+$("leaveRoomBtn").onclick = leaveCurrentRoom;
+$("exitRoomBtn").onclick = leaveCurrentRoom;
+$("clearBtn2").onclick = () => {
+  if (!currentRoom) return;
+  const isGroup = currentRoom.kind === "group";
+  if (isGroup && currentRoom.created_by !== creds.user_id) {
+    status("그룹방의 전체 삭제는 방장만 할 수 있습니다.");
+    return;
+  }
+  if (!confirm("이 방의 모든 메시지를 전체 삭제할까요?\n모든 멤버에게 적용되며 되돌릴 수 없습니다.")) return;
+  if (!confirm("정말 전체 삭제합니다. 계속할까요?")) return;
+  // Empty message_id = whole-room clear (DeleteEvent convention).
+  sendFrame(FrameType.MESSAGE_DELETE, encodeDeleteEvent({
+    messageId: new Uint8Array(), conversationId: conversation }));
+  status("전체 삭제를 요청했습니다.");
+};
+$("syncBtn").onclick = () => syncRoom();
+$("composer").onsubmit = (e) => {
+  e.preventDefault();
+  if (!conversation) { status("먼저 대화를 선택하세요."); return; }
+  const text = $("textInput").value;
+  if (!text) return;
+  const messageId = uuidBytes();
+  const payload = encodeMessageSend({
+    messageId, conversationId: conversation,
+    senderDeviceId: fromHex(creds.device_id),
+    idempotencyKey: uuidBytes(), kind: 1,
+    body: new TextEncoder().encode(text),
+  });
+  const connected = ws && ws.readyState === WebSocket.OPEN;
+  if (connected) {
+    sendFrame(FrameType.MESSAGE_SEND, payload, 0x0008);
+  } else {
+    // Queued with the SAME message/idempotency ids: after reconnect the
+    // server de-duplicates, so a retry can never create a copy.
+    pendingOutbox.push({ payload });
+    status("연결이 끊겨 전송 대기 중입니다. 재연결되면 자동으로 보냅니다.");
+    scheduleReconnect();
+  }
+  // Local echo carries the real message id, so a later sync de-dupes it.
+  bubble({ messageId, senderId: fromHex(creds.user_id),
+           body: new TextEncoder().encode(text),
+           sequence: connected ? "전송 중" : "대기 중" });
+  $("textInput").value = "";
+};
+
+/* ---------- emoji & file ---------- */
+const EMOJIS = ["😀","😁","😂","🤣","😊","😍","😘","😎","🤔","😅","😭","😡",
+  "👍","👎","👏","🙏","💪","🔥","❤️","💔","💯","🎉","🎂","🍕","🍔","☕",
+  "⚽","🎮","🚗","✈️","🏠","💡","📌","✅","❌","⭐","🌙","☀️","🌧️","🐶","🐱"];
+const emojiPanel = $("emojiPanel");
+for (const glyph of EMOJIS) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.textContent = glyph;
+  b.onclick = () => {
+    const input = $("textInput");
+    const at = input.selectionStart ?? input.value.length;
+    input.value = input.value.slice(0, at) + glyph + input.value.slice(at);
+    input.focus();
+    input.selectionStart = input.selectionEnd = at + glyph.length;
+  };
+  emojiPanel.append(b);
+}
+$("emojiBtn").onclick = () => {
+  emojiPanel.style.display = emojiPanel.style.display === "none" ? "block" : "none";
+};
+
+const MAX_FILE_BYTES = 20 * 1024 * 1024; // web-side guard; server verifies hash
+$("fileBtn").onclick = () => $("fileInput").click();
+$("fileInput").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file || !conversation) return;
+  if (file.size > MAX_FILE_BYTES) {
+    status(`파일이 너무 큽니다. 최대 ${formatBytes(MAX_FILE_BYTES)}까지 보낼 수 있습니다.`);
+    return;
+  }
+  try {
+    status(`파일 업로드 중: ${file.name} (${formatBytes(file.size)})`);
+    const data = new Uint8Array(await file.arrayBuffer());
+    const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", data));
+    const grant = await api("/v1/media/init", "POST", {
+      conversation_id: toHex(conversation),
+      content_type: file.type || "application/octet-stream",
+      total_bytes: file.size,
+      sha256: toHex(digest),
+    });
+    const put = await fetch($("api").value + grant.upload_url, {
+      method: "PUT",
+      headers: { Authorization: "Bearer " + creds.access_token },
+      body: data,
+    });
+    if (!put.ok) throw new Error("업로드 검증 실패 (" + put.status + ")");
+    // Bytes live behind the media API; the chat message is a reference.
+    const ref = { media_id: grant.media_id, name: file.name,
+                  size: file.size, content_type: file.type || "application/octet-stream" };
+    const body = new TextEncoder().encode(JSON.stringify(ref));
+    const messageId = uuidBytes();
+    const payload = encodeMessageSend({
+      messageId, conversationId: conversation,
+      senderDeviceId: fromHex(creds.device_id),
+      idempotencyKey: uuidBytes(), kind: KIND_MEDIA, body,
+    });
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      sendFrame(FrameType.MESSAGE_SEND, payload, 0x0008);
+    } else {
+      pendingOutbox.push({ payload });
+      scheduleReconnect();
+    }
+    bubble({ messageId, senderId: fromHex(creds.user_id), kind: KIND_MEDIA,
+             body, sequence: "전송 중" });
+    status("파일을 보냈습니다: " + file.name);
+  } catch (err) {
+    status("파일 전송 실패: " + err.message);
+  }
+});
+
+$("nameInput").value = localStorage.getItem("oxmp.lastName") || "";
+// Session restore: after a page refresh, silently sign back in with the
+// stored account (refreshing the token if needed) instead of starting over.
+(async () => {
+  const last = localStorage.getItem("oxmp.lastName");
+  if (!last || !loadCreds(last)) return;
+  loginStatus(`이전 세션(${last})을 복원 중입니다...`);
+  $("nameInput").value = last;
+  $("startBtn").click();
+})();
+</script>
+</body>
+</html>

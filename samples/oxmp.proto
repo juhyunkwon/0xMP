@@ -1,0 +1,237 @@
+// 0xMP v0.2.0-draft - Protobuf schema (draft)
+// Package name cannot start with a digit, so "oxmp" is intentional
+// (the wire protocol identifier remains "0xmp.v1").
+syntax = "proto3";
+
+package oxmp.v1;
+
+option java_package = "org.oxmp.v1";
+option csharp_namespace = "OxMP.V1";
+
+// ---------------------------------------------------------------------------
+// Negotiation / authentication
+// ---------------------------------------------------------------------------
+
+message Hello {
+  string protocol_id = 1;        // MUST be "0xmp.v1"
+  uint32 min_security_profile = 2; // client will refuse a lower selection
+  uint32 max_security_profile = 3;
+  repeated string features = 4;    // e.g. "compression.zstd", "e2e.mls"
+  string client_name = 5;
+  string client_version = 6;
+}
+
+message HelloResult {
+  string protocol_id = 1;
+  uint32 selected_security_profile = 2;
+  repeated string features = 3;    // server-selected subset only
+  uint32 max_payload_bytes = 4;    // negotiated, never above 1 MiB hard cap
+  string session_id = 5;           // pre-auth session identifier
+}
+
+message Auth {
+  string access_token = 1;         // short-lived token, never logged
+  bytes device_id = 2;             // 16 bytes
+  bytes device_public_key = 3;     // device authentication public key
+  bytes signature = 4;             // signature over session_id by device key
+}
+
+message AuthResult {
+  bool ok = 1;
+  bytes user_id = 2;               // 16 bytes, derived server-side
+  bytes device_id = 3;
+  uint64 access_token_expires_at_ms = 4;
+  string failure_reason = 5;       // coarse reason only; no oracle details
+}
+
+// ---------------------------------------------------------------------------
+// Messaging
+// ---------------------------------------------------------------------------
+
+message MessageContent {
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    TEXT = 1;
+    MEDIA_REFERENCE = 2;
+    SYSTEM = 3;
+    E2E_ENVELOPE = 4;
+  }
+  Kind kind = 1;
+  bytes body = 2; // UTF-8 text, media reference, or E2E envelope bytes
+}
+
+message MessageSend {
+  bytes message_id = 1;        // 16 bytes, client-generated unique id
+  bytes conversation_id = 2;   // 16 bytes
+  bytes sender_device_id = 3;  // 16 bytes; must match authenticated device
+  uint64 client_timestamp_ms = 4; // untrusted; ordering MUST NOT rely on it
+  bytes idempotency_key = 5;   // 16 bytes; reuse verbatim on retry
+  MessageContent content = 6;
+  // sender_id is intentionally absent: it is derived from the AUTH session.
+  // sequence / server_timestamp_ms are server-assigned (see MessageAccepted).
+}
+
+message MessageAccepted {
+  bytes message_id = 1;
+  uint64 sequence = 2;              // per-conversation, server-assigned
+  uint64 server_timestamp_ms = 3;
+  bool duplicate = 4;               // true when replayed by idempotency
+}
+
+message MessageIncoming {
+  bytes message_id = 1;
+  bytes conversation_id = 2;
+  bytes sender_id = 3;
+  bytes sender_device_id = 4;
+  uint64 sequence = 5;
+  uint64 server_timestamp_ms = 6;
+  MessageContent content = 7;
+}
+
+message DeliveryAck {
+  bytes message_id = 1;
+  bytes conversation_id = 2;
+  uint64 sequence = 3;
+}
+
+message DeliveryNotice {
+  bytes message_id = 1;
+  bytes conversation_id = 2;
+  bytes delivered_device_id = 3;
+  uint64 sequence = 4;
+}
+
+message ReadEvent {
+  bytes conversation_id = 1;
+  uint64 up_to_sequence = 2;
+}
+
+message EditEvent {
+  bytes message_id = 1;
+  bytes conversation_id = 2;
+  MessageContent content = 3;
+}
+
+message DeleteEvent {
+  bytes message_id = 1;
+  bytes conversation_id = 2;
+  bool for_everyone = 3;
+}
+
+// ---------------------------------------------------------------------------
+// Synchronisation
+// ---------------------------------------------------------------------------
+
+message SyncRequest {
+  // Empty (all-zero) conversation_id means "all conversations":
+  // the server first returns the per-conversation cursor catalogue.
+  bytes conversation_id = 1;
+  uint64 after_sequence = 2;
+  uint32 limit = 3; // server may clamp (default 100, max 500)
+}
+
+message SyncEvent {
+  enum Type {
+    TYPE_UNSPECIFIED = 0;
+    MESSAGE = 1;
+    EDIT = 2;
+    DELETE = 3;      // tombstone; body is not included
+    READ = 4;
+    MEMBERSHIP = 5;
+  }
+  Type type = 1;
+  uint64 sequence = 2;
+  MessageIncoming message = 3;
+  bytes event_id = 4; // 16 bytes; de-duplicates event propagation
+}
+
+message SyncBatch {
+  bytes conversation_id = 1;
+  repeated SyncEvent events = 2;
+  bool has_more = 3;
+  uint64 next_after_sequence = 4;
+}
+
+message SyncAck {
+  bytes conversation_id = 1;
+  uint64 applied_sequence = 2;
+}
+
+// ---------------------------------------------------------------------------
+// Media (bytes move over HTTPS to object storage, never in frames)
+// ---------------------------------------------------------------------------
+
+message MediaInit {
+  string content_type = 1;
+  uint64 total_bytes = 2;
+  bytes sha256 = 3; // 32 bytes, verified by the server on completion
+}
+
+message MediaGrant {
+  bytes media_id = 1;
+  string https_url = 2;      // presigned, single-purpose, TTL <= 5 minutes
+  uint64 expires_at_ms = 3;
+  uint32 chunk_bytes = 4;     // resumable chunk size
+}
+
+message MediaComplete {
+  bytes media_id = 1;
+}
+
+message MediaDownloadRequest {
+  bytes media_id = 1;
+  bytes conversation_id = 2; // server re-checks membership/permission
+}
+
+// ---------------------------------------------------------------------------
+// End-to-end encryption transport envelopes.
+// The protocol transports verified-library output as opaque bytes.
+// It MUST NOT define its own cryptographic algorithms.
+// ---------------------------------------------------------------------------
+
+message E2EEnvelope {
+  uint32 profile = 1; // 1 = 1:1 ratchet profile, 2 = MLS group profile
+
+  // Profile 1 (1:1): header produced by the verified Signal-protocol library.
+  bytes ratchet_header = 2;
+  bytes ciphertext = 3; // includes the library AEAD tag
+
+  // Profile 2 (group): a single MLS PrivateMessage / PublicMessage blob.
+  bytes mls_message = 4;
+  uint64 epoch = 5;     // group epoch at encryption time
+
+  bytes sender_device_id = 6;
+  // Plaintext body, keys, and nonces managed inside the library MUST NOT
+  // be duplicated into separate plaintext fields here.
+}
+
+message KeyBundlePublish {
+  bytes device_id = 1;
+  bytes identity_key = 2;        // public keys only
+  bytes signed_prekey = 3;
+  bytes signed_prekey_signature = 4;
+  repeated bytes one_time_prekeys = 5;
+  uint32 signed_prekey_id = 6;
+  repeated uint32 one_time_prekey_ids = 7; // parallel to one_time_prekeys
+}
+
+message KeyBundleRequest {
+  bytes user_id = 1;
+  bytes device_id = 2; // empty = all devices of the user
+}
+
+message KeyBundleResponse {
+  repeated KeyBundlePublish bundles = 1;
+}
+
+// ---------------------------------------------------------------------------
+// Errors (carried by the ERROR frame, type 0x7F)
+// ---------------------------------------------------------------------------
+
+message Error {
+  uint32 code = 1;            // see specification section 11
+  string message = 2;         // human-readable, no secrets / stack traces
+  bool retryable = 3;
+  uint64 retry_after_ms = 4;  // REQUIRED for rate limiting (0x0005)
+  bytes reference_id = 5;     // correlation id for support / audit logs
+}

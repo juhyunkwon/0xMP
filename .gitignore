@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# 서버를 실행하면 생기는 로컬 데이터. 계정과 메시지가 들어 있다.
+oxmp.db
+oxmp.db-wal
+oxmp.db-shm
+media-blobs/
+
+# 빌드 산출물
+oxmp.exe
+oxmp.pdb
+*.class
+plugins/csharp/bin/
+plugins/csharp/obj/
+plugins/rust/target/
+
+# 개발용 인증서 개인키
+*.pem
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store

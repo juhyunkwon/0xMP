@@ -1,0 +1,60 @@
+{
+  "description": "0xMP v0.3 cross-platform wire vectors. Multi-byte header integers are big-endian; payloads are Protobuf (package oxmp.v1).",
+  "frames": [
+    {
+      "name": "ping_empty",
+      "type": 64,
+      "hex": "4d500140000000000000"
+    },
+    {
+      "name": "hello_protocol_only",
+      "type": 1,
+      "hex": "4d5001010000000000090a0730786d702e7631"
+    },
+    {
+      "name": "ping_with_extension",
+      "type": 64,
+      "hex": "4d500140000400000006000278796162"
+    }
+  ],
+  "payloads": [
+    {
+      "name": "message_accepted_seq1",
+      "hex": "1001"
+    },
+    {
+      "name": "message_send_fixed_ids",
+      "hex": "0a10000102030405060708090a0b0c0d0e0f1210101112131415161718191a1b1c1d1e1f1a10202122232425262728292a2b2c2d2e2f2080d095ffbc312a10303132333435363738393a3b3c3d3e3f32160801121263726f73732d706c6174666f726d20e29c93"
+    },
+    {
+      "name": "sync_batch_one_text",
+      "hex": "0a10111111111111111111111111111111111262080110011a4a0a10333333333333333333333333333333331210111111111111111111111111111111111a104444444444444444444444444444444428013a100801120c726f6f6d20686973746f72792210222222222222222222222222222222222001"
+    }
+  ],
+  "negative_frames": [
+    {
+      "name": "bad_magic",
+      "hex": "00000140000000000000"
+    },
+    {
+      "name": "unknown_version",
+      "hex": "4d500240000000000000"
+    },
+    {
+      "name": "reserved_flag",
+      "hex": "4d500140800000000000"
+    },
+    {
+      "name": "unknown_type",
+      "hex": "4d500166000000000000"
+    },
+    {
+      "name": "oversize_length_claim",
+      "hex": "4d500110000000200000"
+    },
+    {
+      "name": "truncated_hello",
+      "hex": "4d5001010000000000090a07"
+    }
+  ]
+}
